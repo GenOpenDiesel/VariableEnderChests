@@ -30,6 +30,10 @@ public class InteractiveChatHook implements Listener {
         plugin.getEnderChestManager().updateRows(player);
         EnderChest enderChest = plugin.getEnderChestManager().getEnderChest(player);
 
+        //still loading, leave the vanilla inventory in place instead of throwing
+        if (enderChest == null)
+            return;
+
         event.setInventory(enderChest.getInventory());
     }
 

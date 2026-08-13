@@ -68,6 +68,11 @@ public class ClearEnderChestCommand extends PluginCommand {
             Player other = Bukkit.getPlayerExact(otherPlayer);
             EnderChest enderChest = this.ecm.getEnderChest(other);
 
+            if (enderChest == null) {
+                messenger.sendMessage(sender, MessageKey.ENDERCHEST_LOADING_OTHER, PlaceholderResult.of("<player>", other.getName()));
+                return;
+            }
+
             commonClearEnderChest(sender, enderChest);
 
             return;

@@ -84,7 +84,7 @@ public class EnderChestCommand extends PluginCommand {
             EnderChest enderChest = this.ecm.getEnderChest(other);
 
             if (enderChest == null) {
-                this.plugin.getLogger().severe("Enderchest for online player " + other.getName() + " could not be found.");
+                messenger.sendMessage(console, MessageKey.ENDERCHEST_LOADING_OTHER, playerPlaceholder.getResult(other));
                 return;
             }
 
@@ -133,7 +133,7 @@ public class EnderChestCommand extends PluginCommand {
             EnderChest enderChest = this.ecm.getEnderChest(player);
 
             if (enderChest == null) {
-                this.plugin.getLogger().severe("Enderchest for online player " + player.getName() + " could not be found.");
+                messenger.sendMessage(player, MessageKey.ENDERCHEST_LOADING_SELF);
                 return;
             }
             this.ecm.openEnderChest(enderChest, player, rows);
@@ -153,7 +153,7 @@ public class EnderChestCommand extends PluginCommand {
             EnderChest enderChest = this.ecm.getEnderChest(other);
 
             if (enderChest == null) {
-                this.plugin.getLogger().severe("Enderchest for online player " + other.getName() + " could not be found.");
+                messenger.sendMessage(player, MessageKey.ENDERCHEST_LOADING_OTHER, playerPlaceholder.getResult(other));
                 return;
             }
 

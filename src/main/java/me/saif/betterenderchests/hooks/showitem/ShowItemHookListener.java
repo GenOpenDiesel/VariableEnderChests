@@ -24,6 +24,11 @@ public class ShowItemHookListener implements Listener {
     private void onEChestShow(ViewEnderchestEvent event) {
         EnderData enderData = event.getShownData();
         EnderChest chest = plugin.getEnderChestManager().getEnderChest(event.getPlayer());
+
+        //still loading, leave the vanilla data in place instead of throwing
+        if (chest == null)
+            return;
+
         if (enderData instanceof StaticEnderData) {
             event.setShownData(new CustomStaticEnderData(event.getPlayer(), chest));
         } else if (enderData instanceof LiveEnderData) {

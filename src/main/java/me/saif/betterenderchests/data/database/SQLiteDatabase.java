@@ -28,6 +28,13 @@ public class SQLiteDatabase extends SQLDatabase {
         dataSource.setDriverClassName("org.sqlite.JDBC");
         dataSource.setConnectionTestQuery("SELECT 1");
         dataSource.setPoolName("[VariableEnderChests-SQLite]");
+
+        //without these every single write is its own transaction with its own fsync, which makes
+        //saving the chests of a full server take seconds while everything else waits in line for it.
+        dataSource.addDataSourceProperty("journal_mode", "WAL");
+        dataSource.addDataSourceProperty("synchronous", "NORMAL");
+        //never fail instantly when another connection is writing, wait for it instead
+        dataSource.addDataSourceProperty("busy_timeout", "10000");
     }
 
     @Override

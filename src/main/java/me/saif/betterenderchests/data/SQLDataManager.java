@@ -83,15 +83,27 @@ public abstract class SQLDataManager implements DataManager {
 
     @Override
     public void saveNameAndUUIDs(Map<String, UUID> map) {
+        if (map.isEmpty())
+            return;
         String sql = "REPLACE INTO " + getPlayersTableName() + " (UUID,NAME) VALUES (?, ?)";
         try (Connection connection = this.database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
-            for (String s : map.keySet()) {
-                statement.setString(1, map.get(s).toString());
-                statement.setString(2, s);
-                statement.addBatch();
+            boolean autoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try {
+                for (String s : map.keySet()) {
+                    statement.setString(1, map.get(s).toString());
+                    statement.setString(2, s);
+                    statement.addBatch();
+                }
+                statement.executeBatch();
+                connection.commit();
+            } catch (SQLException e) {
+                connection.rollback();
+                throw e;
+            } finally {
+                connection.setAutoCommit(autoCommit);
             }
-            statement.executeBatch();
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -112,17 +124,31 @@ public abstract class SQLDataManager implements DataManager {
 
     @Override
     public void saveEnderChestMultiple(Map<UUID, EnderChestSnapshot> snapshotMap) {
+        if (snapshotMap.isEmpty())
+            return;
         String sql = "REPLACE INTO " + getDataTableName() + " (UUID,`ROWS`,CONTENTS) VALUES (?,?,?)";
         try (Connection connection = this.database.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
-            for (UUID uuid : snapshotMap.keySet()) {
-                EnderChestSnapshot snapshot = snapshotMap.get(uuid);
-                statement.setString(1, uuid.toString());
-                statement.setInt(2, snapshot.getRows());
-                statement.setString(3, ItemStackSerializer.serialize(snapshot.getContents()));
-                statement.addBatch();
+            //one transaction for the whole batch instead of one per chest. on sqlite this is the
+            //difference between a save of a full server taking seconds and taking milliseconds.
+            boolean autoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try {
+                for (UUID uuid : snapshotMap.keySet()) {
+                    EnderChestSnapshot snapshot = snapshotMap.get(uuid);
+                    statement.setString(1, uuid.toString());
+                    statement.setInt(2, snapshot.getRows());
+                    statement.setString(3, ItemStackSerializer.serialize(snapshot.getContents()));
+                    statement.addBatch();
+                }
+                statement.executeBatch();
+                connection.commit();
+            } catch (SQLException e) {
+                connection.rollback();
+                throw e;
+            } finally {
+                connection.setAutoCommit(autoCommit);
             }
-            statement.executeBatch();
         } catch (SQLException e) {
             e.printStackTrace();
         }

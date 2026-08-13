@@ -17,6 +17,8 @@ public enum MessageKey {
     COMMAND_PLAYER_ONLY("internal.command.command-player-only", "You must be a player to use this command"),
     NO_ENDERCHEST_SELF("configurable.no-rows", "&cYou do not have an enderchest."),
     NO_ENDERCHEST_OTHER("configurable.no-enderchest-found", "&c<player> does not have an enderchest."),
+    ENDERCHEST_LOADING_SELF("configurable.enderchest-loading-self", "&cYour enderchest is still loading. Please try again in a moment."),
+    ENDERCHEST_LOADING_OTHER("configurable.enderchest-loading-other", "&c<player>'s enderchest is still loading. Please try again in a moment."),
     COMMAND_USAGE("configurable.command-usage", "&cUsage: <command>"),
     BLACKLIST_MESSAGE("configurable.blacklisted-message", "&cYou cannot put that item into an ender chest."),
 

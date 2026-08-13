@@ -4,6 +4,7 @@ import me.saif.betterenderchests.data.database.SQLDatabase;
 import me.saif.betterenderchests.data.database.SQLiteDatabase;
 import me.saif.betterenderchests.enderchest.EnderChestSnapshot;
 import me.saif.betterenderchests.utils.TimeUtils;
+import org.bukkit.Bukkit;
 
 import java.io.File;
 import java.sql.Connection;
@@ -13,11 +14,18 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.*;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class SQLiteDataManager extends SQLDataManager {
 
-    private final ExecutorService executorService = Executors.newSingleThreadExecutor();
+    private final ExecutorService executorService = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "VariableEnderChests-SQLite-Worker");
+        thread.setDaemon(true);
+        return thread;
+    });
+
+    private volatile boolean warnedAboutServerThread = false;
 
     public SQLiteDataManager(SQLiteDatabase database) {
         super(database);
@@ -92,19 +100,40 @@ public class SQLiteDataManager extends SQLDataManager {
     }
 
     private void executeOnSingleThread(Runnable runnable) {
+        warnIfServerThread();
         try {
             executorService.submit(runnable).get();
-        } catch (InterruptedException | ExecutionException e) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+        } catch (ExecutionException e) {
             throw new RuntimeException(e);
         }
     }
-    
+
     private <T> T executeOnSingleThread(Callable<T> callable) {
+        warnIfServerThread();
         try {
             return executorService.submit(callable).get();
-        } catch (InterruptedException | ExecutionException e) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+        } catch (ExecutionException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    //every call here waits for the single sqlite worker to be free. doing that from a server thread
+    //stalls the whole server until the worker is done, which is what the watchdog kills the server for.
+    //nothing in the plugin should hit this anymore, so shout about it if something still does.
+    private void warnIfServerThread() {
+        if (warnedAboutServerThread || !Bukkit.isPrimaryThread())
+            return;
+
+        warnedAboutServerThread = true;
+        Bukkit.getLogger().log(Level.WARNING, "[VariableEnderChests] A database call was made from a server thread. "
+                + "This can freeze the server if the database is busy. Please report the stacktrace below.",
+                new IllegalStateException("Database access on server thread"));
     }
 
     @Override
@@ -126,9 +155,15 @@ public class SQLiteDataManager extends SQLDataManager {
     public void finishUp() {
         this.executorService.shutdown();
         try {
-            this.executorService.awaitTermination(System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+            //this used to pass System.currentTimeMillis() as the timeout, which is decades long,
+            //so a stuck query would hang the shutdown forever instead of letting the server stop.
+            if (!this.executorService.awaitTermination(30, TimeUnit.SECONDS)) {
+                Bukkit.getLogger().warning("[VariableEnderChests] Database tasks did not finish within 30 seconds. Forcing shutdown.");
+                this.executorService.shutdownNow();
+            }
         } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+            Thread.currentThread().interrupt();
+            this.executorService.shutdownNow();
         }
         super.finishUp();
     }

@@ -6,7 +6,7 @@
 
     <groupId>me.saif</groupId>
     <artifactId>VariableEnderChests</artifactId>
-    <version>1.11.9.0</version>
+    <version>1.11.9.1</version>
     <packaging>jar</packaging>
 
     <name>BetterEnderChests</name>
@@ -99,12 +99,18 @@
             <url>https://repo.codemc.org/repository/maven-public/</url>
             <layout>default</layout>
         </repository>
+        <repository>
+            <id>spigot-repo</id>
+            <url>https://hub.spigotmc.org/nexus/content/repositories/snapshots/</url>
+        </repository>
     </repositories>
 
     <dependencies>
+        <!-- spigot-api instead of the full spigot server jar: nothing here touches NMS or CraftBukkit
+             at compile time (it is all reflection), and spigot-api can be resolved without BuildTools -->
         <dependency>
             <groupId>org.spigotmc</groupId>
-            <artifactId>spigot</artifactId>
+            <artifactId>spigot-api</artifactId>
             <version>1.19.4-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>

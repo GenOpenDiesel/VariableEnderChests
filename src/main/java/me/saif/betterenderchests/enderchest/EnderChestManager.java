@@ -536,14 +536,22 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
         FoliaScheduler.runAsync(this.getPlugin(), () -> {
             EnderChestSnapshot snapshot = this.dataManager.loadEnderChest(name);
 
-            EnderChest enderChest = snapshot == null ? null : new EnderChest(snapshot.getUuid(), snapshot.getName(), snapshot.getContents(), snapshot.getRows());
+            EnderChest loaded = snapshot == null ? null : new EnderChest(snapshot.getUuid(), snapshot.getName(), snapshot.getContents(), snapshot.getRows());
             FoliaScheduler.runGlobal(this.getPlugin(), () -> {
                 this.nameCallbackMap.remove(mcName);
-                if (enderChest != null) {
-                    this.uuidEnderChestMap.put(snapshot.getUuid(), enderChest);
-                    this.nameUUIDMap.put(mcName, snapshot.getUuid());
+
+                if (loaded == null) {
+                    callback.setResult(null);
+                    return;
                 }
-                callback.setResult(enderChest);
+
+                //the player may have logged in while this query was running. handing out this copy
+                //next to the one they are already using would mean the same items exist twice, so
+                //always keep the cached chest and throw the copy away.
+                EnderChest existing = this.uuidEnderChestMap.putIfAbsent(snapshot.getUuid(), loaded);
+                this.nameUUIDMap.put(mcName, snapshot.getUuid());
+
+                callback.setResult(existing == null ? loaded : existing);
             });
         });
 
@@ -563,13 +571,20 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
         FoliaScheduler.runAsync(this.getPlugin(), () -> {
             EnderChestSnapshot snapshot = this.dataManager.loadEnderChest(uuid);
 
-            EnderChest enderChest = snapshot == null ? null : new EnderChest(snapshot.getUuid(), snapshot.getName(), snapshot.getContents(), snapshot.getRows());
+            EnderChest loaded = snapshot == null ? null : new EnderChest(snapshot.getUuid(), snapshot.getName(), snapshot.getContents(), snapshot.getRows());
             FoliaScheduler.runGlobal(this.getPlugin(), () -> {
                 this.uuidCallbackMap.remove(uuid);
+
                 //uuidEnderChestMap is a ConcurrentHashMap, putting a null here threw a NullPointerException
-                if (enderChest != null)
-                    this.uuidEnderChestMap.put(uuid, enderChest);
-                callback.setResult(enderChest);
+                if (loaded == null) {
+                    callback.setResult(null);
+                    return;
+                }
+
+                //same as above: never hand out a second copy of a chest that is already in use
+                EnderChest existing = this.uuidEnderChestMap.putIfAbsent(uuid, loaded);
+
+                callback.setResult(existing == null ? loaded : existing);
             });
         });
 

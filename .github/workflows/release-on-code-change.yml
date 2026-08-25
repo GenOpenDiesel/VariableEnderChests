@@ -1,0 +1,58 @@
+name: Release on code change
+
+on:
+  push:
+    paths:
+      - "src/**"
+      - "pom.xml"
+      - ".github/workflows/release-on-code-change.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Build plugin
+        run: mvn --batch-mode --no-transfer-progress clean package
+
+      - name: Prepare release metadata
+        id: release
+        shell: bash
+        run: |
+          short_sha="${GITHUB_SHA::7}"
+          tag="build-${GITHUB_RUN_NUMBER}-${short_sha}"
+          artifact="$(find target -maxdepth 1 -type f -name '*.jar' ! -name 'original-*' -print -quit)"
+          if [[ -z "$artifact" ]]; then
+            echo "No release JAR found in target/" >&2
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "artifact=$artifact" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+          ARTIFACT: ${{ steps.release.outputs.artifact }}
+        run: >-
+          gh release create "$TAG" "$ARTIFACT"
+          --target "$GITHUB_SHA"
+          --title "$TAG"
+          --generate-notes

@@ -100,6 +100,14 @@
             <layout>default</layout>
         </repository>
         <repository>
+            <id>minebench-repo</id>
+            <url>https://repo.minebench.de/</url>
+        </repository>
+        <repository>
+            <id>loohp-repo</id>
+            <url>https://repo.loohpjames.com/repository</url>
+        </repository>
+        <repository>
             <id>spigot-repo</id>
             <url>https://hub.spigotmc.org/nexus/content/repositories/snapshots/</url>
         </repository>
@@ -162,15 +170,13 @@
             <groupId>de.themoep.showitem</groupId>
             <artifactId>api</artifactId>
             <version>1.7.3</version>
-            <scope>system</scope>
-            <systemPath>${user.home}/.m2/repository/de/themoep/showitem/api/1.7.3/api-1.7.3.jar</systemPath>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.loohp</groupId>
             <artifactId>InteractiveChat</artifactId>
             <version>4.2.12.0</version>
-            <scope>system</scope>
-            <systemPath>${user.home}/.m2/repository/com/loohp/InteractiveChat/4.2.12.0/InteractiveChat-4.2.12.0.jar</systemPath>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 </project>

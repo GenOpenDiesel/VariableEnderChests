@@ -1,7 +1,7 @@
 name: VariableEnderChests
 version: '${project.version}'
 main: me.saif.betterenderchests.VariableEnderChests
-author: minion325
+author: genallthebest
 api-version: 1.13
 folia-supported: true
 softdepend: [PlaceholderAPI, ChestSort, ShowItem, InteractiveChat]

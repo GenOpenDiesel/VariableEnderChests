@@ -1,5 +1,17 @@
 # Jedna skrzynka: przeniesienie vanilla do VariableEnderChests
 
+## Minecraft 26.3
+
+Wersja 1.11.9.3 zawiera NBT-API 2.16.1 z obsługą Minecraft 26.3.
+Sprawdzona na Paper 26.3 build 223 i Java 25: 119 sprawdzeń integracyjnych,
+w tym odczyt starej bazy i migracja danych vanilla z 1.21.11, shulkery,
+nowy przedmiot z 26.3, odbiór nadmiaru oraz wspólna skrzynka dla bloku i komendy.
+Serwer Paper 26.3 wymaga Java 25.
+
+Podmień JAR przy wyłączonym serwerze. Zachowaj konfigurację i `data.db`.
+
+## Wspólny magazyn
+
 Ta wersja dodaje `single-enderchest: true` (domyślnie). Blok enderchesta,
 komenda pluginu i próby otwarcia vanilla przez inne pluginy prowadzą do magazynu
 VariableEnderChests. W tym trybie lista `disabled-worlds` jest ignorowana.

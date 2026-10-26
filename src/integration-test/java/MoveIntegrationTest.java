@@ -54,15 +54,35 @@ public final class MoveIntegrationTest extends JavaPlugin {
         Files.createDirectories(playerdata);
         try (Connection c = vec.getSQLDatabase().getConnection(); Statement s = c.createStatement()) {
             s.executeUpdate("DROP TRIGGER IF EXISTS reject_move");
-            for (int i = 1; i <= 6; i++) {
+            for (int i = 1; i <= 7; i++) {
                 Files.deleteIfExists(file(id(i)));
                 s.executeUpdate("DELETE FROM enderchests WHERE UUID='" + id(i) + "'");
                 //The journal is created by the converter; it may not exist on the first run.
                 try { s.executeUpdate("DELETE FROM vec_vanilla_moves WHERE UUID='" + id(i) + "'"); } catch (SQLException ignored) { }
             }
         }
+        //Synthetic fixtures written by the previous release on Paper 1.21.11.
+        if (getResource("legacy-1.21.11-chest.txt") != null) {
+            String legacy;
+            try (java.io.InputStream input = getResource("legacy-1.21.11-chest.txt")) {
+                legacy = new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            }
+            ItemStack[] decoded = ItemStackSerializer.deserialize(legacy);
+            require(decoded.length == 54 && decoded[0].getType() == Material.DIAMOND
+                    && decoded[0].getAmount() == 64, "previous release database format loads");
+            require(decoded[0].getItemMeta().getDisplayName().equals("existing-0"), "legacy metadata survives upgrade");
+            require(equal(decoded, ItemStackSerializer.deserialize(ItemStackSerializer.serialize(decoded))), "legacy database round trip");
+            try (java.io.InputStream input = getResource("legacy-1.21.11-player.dat")) {
+                Files.copy(input, file(id(7)), StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
         ItemStack[] old = new ItemStack[54];
         Arrays.setAll(old, i -> named(Material.DIAMOND, 64, "existing-" + i));
+        Material modernItem = Material.matchMaterial("ABANDONED_CAMP_MAP");
+        if (Bukkit.getBukkitVersion().startsWith("26.3"))
+            require(modernItem != null, "Minecraft 26.3 material is available");
+        if (modernItem != null)
+            old[53] = named(modernItem, 1, "Minecraft 26.3 item");
         ItemStack[] vanilla = new ItemStack[27];
         Arrays.setAll(vanilla, i -> named(Material.EMERALD, 64, "vanilla-" + i));
         ItemStack box = new ItemStack(Material.SHULKER_BOX);
@@ -88,6 +108,16 @@ public final class MoveIntegrationTest extends JavaPlugin {
         require(new NBTFile(file(full).toFile()).getString("UnrelatedSentinel").equals("keep me"), "unrelated NBT preserved");
         require(load(id(2))[0].getAmount() == 17, "player with no plugin chest moved");
         require(load(id(3))[50].getAmount() == 11 && load(id(3))[0].getAmount() == 9, "sparse merge preserves existing slots");
+        if (Files.exists(file(id(7)))) {
+            ItemStack[] upgraded = load(id(7));
+            require(upgraded[0].getType() == Material.EMERALD && upgraded[0].getAmount() == 64,
+                    "vanilla playerdata from 1.21.11 migrates");
+            require(upgraded[26].getType() == Material.SHULKER_BOX, "legacy shulker survives migration");
+            BlockStateMeta upgradedMeta = (BlockStateMeta) upgraded[26].getItemMeta();
+            ItemStack nested = ((ShulkerBox) upgradedMeta.getBlockState()).getInventory().getItem(0);
+            require(nested != null && nested.getType() == Material.NETHER_STAR && nested.getAmount() == 13,
+                    "legacy shulker contents survive migration");
+        }
         require(new VanillaMergeConverter(vec).convert(), "repeat succeeds");
         require(equal(expected, load(full)), "repeat does not duplicate items");
 

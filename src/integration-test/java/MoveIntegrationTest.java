@@ -37,7 +37,9 @@ public final class MoveIntegrationTest extends JavaPlugin {
     public void onEnable() {
         vec = (VariableEnderChests) Bukkit.getPluginManager().getPlugin("VariableEnderChests");
         Bukkit.getScheduler().runTaskLater(this, () -> {
-            playerdata = Bukkit.getWorlds().get(0).getWorldFolder().toPath().resolve("playerdata");
+            Path world = Bukkit.getWorlds().get(0).getWorldFolder().toPath();
+            playerdata = Bukkit.getBukkitVersion().startsWith("1.")
+                    ? world.resolve("playerdata") : Path.of("test-world", "players", "data");
             Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
                 try {
                     storageTests();

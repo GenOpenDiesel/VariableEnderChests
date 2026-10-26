@@ -2,13 +2,23 @@
 
 ## Minecraft 26.3
 
-Wersja 1.11.9.5 zawiera NBT-API 2.16.1 z obsługą Minecraft 26.3.
+Wersja 1.11.9.6 zawiera NBT-API 2.16.1 z obsługą Minecraft 26.3.
 Migrację i odbiór nadmiaru sprawdzono na Paper 26.3 build 223 i Java 25:
 192 sprawdzenia, w tym odczyt starej bazy i migracja danych vanilla z 1.21.11, shulkery,
 nowy przedmiot z 26.3, odbiór nadmiaru oraz wspólna skrzynka dla bloku i komendy.
 Serwer Paper 26.3 wymaga Java 25.
 
 Podmień JAR przy wyłączonym serwerze. Zachowaj konfigurację i `data.db`.
+
+Od 1.11.9.6 konwerter obsługuje współdzielony folder `<świat>/players/data`
+używany przez Minecraft 26.1 i nowsze. Uwzględnia także sytuację, w której Bukkit
+zwraca folder wymiaru `<świat>/dimensions/minecraft/overworld`. Dla starszych wersji
+obsługiwany jest dawny folder `<świat>/playerdata`. Wybrana ścieżka jest wypisywana
+w konsoli jako `Vanilla source folder`. Jeśli nowy folder istnieje, ma pierwszeństwo
+przed starymi kopiami danych.
+
+Wersje 1.11.9.2–1.11.9.5 nie rozpoznawały poprawnie nowego układu folderów.
+Do migracji na 26.3 użyj wersji 1.11.9.6 lub nowszej.
 
 ## Gdy obie skrzynki są pełne
 
@@ -52,7 +62,8 @@ VariableEnderChests. W tym trybie lista `disabled-worlds` jest ignorowana.
 
 Nowy konwerter zachowuje dotychczasowe przedmioty pluginowe, dodaje WSZYSTKIE
 przedmioty vanilla i po zatwierdzeniu zapisu w bazie usuwa `EnderItems` z plików
-`playerdata/*.dat` głównego świata. To przeniesienie, a nie kopia. Identyczne
+`players/data/*.dat` głównego zapisu świata (na starszych wersjach `playerdata/*.dat`).
+To przeniesienie, a nie kopia. Identyczne
 przedmioty z obu magazynów też są zachowywane; nie próbuje zgadywać, które są duplikatami.
 
 Nadmiar ponad pojemność skrzynki zostaje w tej samej bazie pluginu. Odbiera się go

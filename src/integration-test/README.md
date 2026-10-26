@@ -49,3 +49,21 @@ Version 1.11.9.4 passed 122 migration assertions and 30 anti-duplication
 assertions on Paper 26.3 build 223 / Java 25 on 2026-10-26.
 Version 1.11.9.5 passed 192 migration assertions on the same runtime, including
 full 27+27 and 54+27 chests and owner retrieval without the retrieval permission.
+
+## Minecraft 26 player data layout and copied-data validation
+
+On Minecraft 26.x the migration fixtures are placed independently in
+`test-world/players/data`, not below Bukkit's dimension folder. This catches
+regressions where the converter accidentally reads a stale directory.
+`PlayerDataPathsTest` covers modern/legacy layouts and dimension paths.
+
+`CopiedDataMigrationTest` is an additional opt-in helper for disposable copies.
+Package the compiled classes with `copied-data-plugin.yml` renamed to `plugin.yml`.
+It refuses to run without `copy-world`, `ALLOW_COPIED_VEC_DATA_TEST`, a localhost
+bind and zero online players. Copy a test database into its plugin directory and
+copied vanilla files into `copy-world/players/data` before startup. Never place
+this helper or marker on a real server. No real player data is bundled in this repository.
+
+It verifies the complete item multiset and metadata per player, stack counts,
+unchanged configured row counts, empty vanilla sources, unchanged unrelated player
+NBT, untouched `.dat_old` files, and a repeat run without item duplication.

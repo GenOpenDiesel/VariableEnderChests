@@ -1,0 +1,5 @@
+name: CopiedDataMigrationTest
+version: 1.0
+main: integration.CopiedDataMigrationTest
+api-version: '1.21'
+depend: [VariableEnderChests]

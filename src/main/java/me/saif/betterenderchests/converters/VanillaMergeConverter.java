@@ -20,7 +20,7 @@ import java.util.stream.Stream;
 /** Offline move: merge into plugin storage, commit, and only then clear EnderItems. */
 public class VanillaMergeConverter extends Converter {
     private static final String JOURNAL = "vec_vanilla_moves";
-    private final Path playerdata;
+    private final Path worldFolder;
 
     public VanillaMergeConverter(VariableEnderChests plugin) {
         this(plugin, "VanillaMergeConverter");
@@ -28,7 +28,7 @@ public class VanillaMergeConverter extends Converter {
 
     protected VanillaMergeConverter(VariableEnderChests plugin, String name) {
         super(plugin, name);
-        this.playerdata = Bukkit.getWorlds().get(0).getWorldFolder().toPath().resolve("playerdata");
+        this.worldFolder = Bukkit.getWorlds().get(0).getWorldFolder().toPath();
     }
 
     @Override
@@ -38,8 +38,8 @@ public class VanillaMergeConverter extends Converter {
                 throw new IllegalArgumentException("VanillaMergeConverter takes no flags. It always preserves both inventories.");
             if (!Bukkit.getOnlinePlayers().isEmpty() || !plugin.getEnderChestManager().canMergeVanilla())
                 throw new IllegalStateException("Restart with logins blocked and run the merge before any player joins.");
-            if (!Files.isDirectory(playerdata))
-                throw new IOException("Player data folder not found: " + playerdata);
+            Path playerdata = PlayerDataPaths.resolve(worldFolder);
+            plugin.getLogger().info("Vanilla source folder: " + playerdata.toAbsolutePath());
 
             Path backup = plugin.getDataFolder().toPath().resolve("backups")
                     .resolve("vanilla-move-" + System.currentTimeMillis() + "-" + UUID.randomUUID());
@@ -207,7 +207,7 @@ public class VanillaMergeConverter extends Converter {
     }
 
     private void clearVanilla(Path file) throws IOException {
-        Path temporary = Files.createTempFile(playerdata, "vec-move-", ".tmp");
+        Path temporary = Files.createTempFile(file.getParent(), "vec-move-", ".tmp");
         try {
             Files.copy(file, temporary, StandardCopyOption.REPLACE_EXISTING);
             NBTFile moved = new NBTFile(temporary.toFile());

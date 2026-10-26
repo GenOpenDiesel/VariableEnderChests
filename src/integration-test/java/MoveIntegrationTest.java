@@ -99,7 +99,9 @@ public final class MoveIntegrationTest extends JavaPlugin {
         sparse[50] = named(Material.EMERALD, 11, "keep original slot");
         put(id(3), sparse);
         source(id(3), new ItemStack[]{named(Material.DIAMOND, 9, "incoming")});
-        require(new VanillaMergeConverter(vec).convert(), "migration succeeds");
+        require(vec.getConverterManager().getConverter("VanillaConverter") instanceof VanillaMergeConverter,
+                "legacy converter name is also a safe move");
+        require(vec.getConverterManager().getConverter("VanillaConverter").convert(), "migration succeeds using legacy command name");
         expected = load(full);
         require(expected.length == 81, "81 stacks survive two full chests");
         for (int i = 0; i < 54; i++) require(old[i].equals(expected[i]), "existing metadata/slot " + i);
@@ -120,6 +122,8 @@ public final class MoveIntegrationTest extends JavaPlugin {
         }
         require(new VanillaMergeConverter(vec).convert(), "repeat succeeds");
         require(equal(expected, load(full)), "repeat does not duplicate items");
+        require(!vec.getConverterManager().getConverter("VanillaConverter").convert("overwrite"), "legacy overwrite flag is refused");
+        require(equal(expected, load(full)), "refused overwrite leaves merged items intact");
 
         //Simulate a crash after committing the merged chest, before clearing playerdata.
         UUID interrupted = id(4);

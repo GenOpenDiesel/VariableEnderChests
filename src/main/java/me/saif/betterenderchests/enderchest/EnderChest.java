@@ -126,7 +126,7 @@ public class EnderChest implements InventoryHolder {
     public boolean hasViewers() {
         List<HumanEntity> viewers = this.inventory.getViewers();
         List<HumanEntity> retrievalViewers = this.retrievalInventory.getViewers();
-        return viewers.isEmpty() || retrievalViewers.isEmpty();
+        return !viewers.isEmpty() || !retrievalViewers.isEmpty();
     }
 
     protected void openInventory(Player player) {

@@ -2,13 +2,27 @@
 
 ## Minecraft 26.3
 
-Wersja 1.11.9.3 zawiera NBT-API 2.16.1 z obsługą Minecraft 26.3.
-Sprawdzona na Paper 26.3 build 223 i Java 25: 119 sprawdzeń integracyjnych,
+Wersja 1.11.9.4 zawiera NBT-API 2.16.1 z obsługą Minecraft 26.3.
+Sprawdzona na Paper 26.3 build 223 i Java 25: 122 sprawdzenia migracji
+i 30 sprawdzeń zabezpieczeń przed kopiowaniem,
 w tym odczyt starej bazy i migracja danych vanilla z 1.21.11, shulkery,
 nowy przedmiot z 26.3, odbiór nadmiaru oraz wspólna skrzynka dla bloku i komendy.
 Serwer Paper 26.3 wymaga Java 25.
 
 Podmień JAR przy wyłączonym serwerze. Zachowaj konfigurację i `data.db`.
+
+## Zabezpieczenia przed kopiowaniem w 1.11.9.4
+
+- Opóźniony odczyt nie zastępuje skrzynki, z której gracz już korzysta.
+  Wywołania API gracza współdzielą odczyt w tle i zwracają `null` do jego zakończenia.
+- Otwarta skrzynka lub okno odbioru nadmiaru zatrzymuje tę samą instancję w pamięci.
+- Skrzynka offline jest usuwana z pamięci dopiero po udanym zapisie i tylko wtedy,
+  gdy od wykonania kopii do zapisu nie zmieniono jej zawartości ani rozmiaru.
+  Błąd zapisu pozostawia ją w pamięci. Kopie do zapisu nie współdzielą mutowalnych itemów.
+- Końcowy zapis przy wyłączeniu czeka na trwający zapis okresowy, aby starsze dane
+  nie nadpisały nowszych. Oczekujące odczyty powstrzymują usuwanie z pamięci.
+- Zarówno `VanillaConverter`, jak i `VanillaMergeConverter` przenoszą przedmioty
+  do pluginu i czyszczą vanilla po zatwierdzeniu transakcji. `overwrite` jest odrzucane.
 
 ## Wspólny magazyn
 
@@ -44,7 +58,8 @@ Jeżeli migracja zgłosi błąd, pozostaw wejścia zablokowane, sprawdź błąd 
 zrestartuj i ponów NOWY konwerter. Nie przywracaj samych plików graczy lub samej
 bazy z różnych momentów — cofnięcie musi obejmować obie strony i dziennik migracji.
 
-Nie używaj starego `VanillaConverter overwrite` do scalania: nadpisuje magazyn pluginu.
+W oryginalnej wersji autora `VanillaConverter overwrite` nadpisuje magazyn pluginu;
+w tej wersji flaga jest odrzucana i nie trzeba jej podawać.
 Powrót do starszej wersji pluginu przed odebraniem nadmiaru ponad 54 sloty nie jest
 bezpieczny, ponieważ starsza wersja obcinała dłuższe magazyny.
 

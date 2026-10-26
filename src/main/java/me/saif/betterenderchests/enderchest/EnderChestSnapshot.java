@@ -15,7 +15,7 @@ public class EnderChestSnapshot {
     public EnderChestSnapshot(UUID uuid, String name, ItemStack[] contents, int rows) {
         this.uuid = uuid;
         this.name = name;
-        this.contents = Arrays.copyOf(contents, Math.max(54, contents.length));
+        this.contents = copyItems(contents);
         this.rows = rows;
     }
 
@@ -23,7 +23,7 @@ public class EnderChestSnapshot {
         this.name = enderChest.getName();
         this.uuid = enderChest.getUUID();
         this.rows = enderChest.getLastNumRows();
-        this.contents = enderChest.getContents();
+        this.contents = copyItems(enderChest.getContents());
     }
 
     public String getName() {
@@ -45,11 +45,19 @@ public class EnderChestSnapshot {
     public ItemStack get(int i) {
         if (i >= contents.length || i < 0)
             return null;
-        return contents[i];
+        return contents[i] == null ? null : contents[i].clone();
     }
 
     public ItemStack[] getContents() {
-        return Arrays.copyOf(contents, contents.length);
+        return copyItems(contents);
+    }
+
+    private static ItemStack[] copyItems(ItemStack[] source) {
+        ItemStack[] copy = Arrays.copyOf(source, Math.max(54, source.length));
+        for (int i = 0; i < copy.length; i++)
+            if (copy[i] != null)
+                copy[i] = copy[i].clone();
+        return copy;
     }
 
     @Override

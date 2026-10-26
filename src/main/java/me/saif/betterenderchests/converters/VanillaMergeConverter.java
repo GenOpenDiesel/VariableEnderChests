@@ -18,12 +18,16 @@ import java.util.logging.Level;
 import java.util.stream.Stream;
 
 /** Offline move: merge into plugin storage, commit, and only then clear EnderItems. */
-public final class VanillaMergeConverter extends Converter {
+public class VanillaMergeConverter extends Converter {
     private static final String JOURNAL = "vec_vanilla_moves";
     private final Path playerdata;
 
     public VanillaMergeConverter(VariableEnderChests plugin) {
-        super(plugin, "VanillaMergeConverter");
+        this(plugin, "VanillaMergeConverter");
+    }
+
+    protected VanillaMergeConverter(VariableEnderChests plugin, String name) {
+        super(plugin, name);
         this.playerdata = Bukkit.getWorlds().get(0).getWorldFolder().toPath().resolve("playerdata");
     }
 

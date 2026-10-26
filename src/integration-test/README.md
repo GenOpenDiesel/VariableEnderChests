@@ -27,3 +27,23 @@ The original migration suite was tested against Paper 1.21.11 with Java 21.
 Minecraft 26.3 requires Java 25; use that runtime for the 26.3 compatibility suite.
 Paper 26.3 build 223 with Java 25 passed all 119 assertions on 2026-10-26.
 All bundled fixtures contain only synthetic test inventory data.
+
+## Anti-duplication regressions
+
+Compile both Java sources in `java/` against the built shaded plugin and the target
+Paper runtime/API libraries (including JetBrains annotations). Run one helper at a time.
+For the separate anti-duplication suite, package the classes with `anti-dupe-plugin.yml`
+renamed to `plugin.yml`, instead of the migration suite's `plugin.yml`.
+It uses the same `test-world` and `ALLOW_SYNTHETIC_VEC_TESTS` guards and shuts down
+the server after `ANTI-DUPE PASS` or `ANTI-DUPE FAILED`.
+
+Checks all four viewer combinations; cache retention during slow/failed writes;
+edits during an in-flight save; immutable snapshots; reopens after successful
+eviction; delayed UUID/name/join loads; coalesced async player API loads; and
+shutdown while an older autosave is still in flight. Database reads and writes
+are controlled with latches and synthetic snapshots to reproduce timing reliably.
+No Minecraft clients or real player data are used. A deliberate write failure
+prints an expected error before the successful result.
+
+Version 1.11.9.4 passed 122 migration assertions and 30 anti-duplication
+assertions on Paper 26.3 build 223 / Java 25 on 2026-10-26.

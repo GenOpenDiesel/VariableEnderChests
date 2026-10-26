@@ -150,7 +150,7 @@ public abstract class SQLDataManager implements DataManager {
                 connection.setAutoCommit(autoCommit);
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new IllegalStateException("Could not save enderchests; cached inventories must be retained.", e);
         }
     }
 

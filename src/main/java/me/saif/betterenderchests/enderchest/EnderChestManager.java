@@ -33,6 +33,7 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
@@ -47,10 +48,14 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
     private final Map<UUID, Callback<EnderChest>> uuidCallbackMap = new ConcurrentHashMap<>();
     private final Map<CaselessString, Callback<EnderChest>> nameCallbackMap = new ConcurrentHashMap<>();
     private final Set<EnderChestSnapshot> snapshotsToSave = Sets.newConcurrentHashSet();
+    private final AtomicBoolean savingChests = new AtomicBoolean();
+    private final Object saveLock = new Object();
+    private volatile boolean shuttingDown;
 
     //data fetched on the login thread, so that PlayerJoinEvent never has to touch the database
     private final Map<UUID, EnderChestSnapshot> preloadedSnapshots = new ConcurrentHashMap<>();
     private final Set<UUID> preloadedPlayers = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> preloadingPlayers = ConcurrentHashMap.newKeySet();
     //uuids that currently have a load running, so we never queue the same load twice
     private final Set<UUID> loadingChests = ConcurrentHashMap.newKeySet();
 
@@ -135,30 +140,56 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
         });
 
         FoliaScheduler.runGlobalTimer(this.getPlugin(), () -> {
-            Map<UUID, EnderChestSnapshot> toSave = new HashMap<>();
-            Set<UUID> toRemove = new HashSet<>();
-            for (EnderChest enderChest : this.uuidEnderChestMap.values()) {
-                toSave.put(enderChest.getUUID(), enderChest.snapshot());
-                if (Bukkit.getPlayer(enderChest.getUUID()) == null && !enderChest.hasViewers()) {
-                    toRemove.add(enderChest.getUUID());
-                }
-            }
+            saveCachedChests();
 
-            for (UUID uuid : toRemove) {
-                EnderChest enderChest = this.uuidEnderChestMap.remove(uuid);
-
-                this.getPlugin().getLogger().info("Saving data for " + enderChest.getName());
-            }
-
-            FoliaScheduler.runAsync(this.getPlugin(), () -> this.dataManager.saveEnderChestMultiple(toSave));
-
-            //removeIf instead of removing while iterating, which throws a ConcurrentModificationException
-            this.nameCallbackMap.keySet().removeIf(minecraftName -> Bukkit.getPlayerExact(minecraftName.getOriginal()) == null);
+            //Pending name callbacks are removed by their completion handlers. Removing an offline
+            //player's callback here would hide an in-flight read from cache eviction checks.
 
             //drop preloaded data of players that never made it in game
             this.preloadedPlayers.removeIf(uuid -> Bukkit.getPlayer(uuid) == null);
             this.preloadedSnapshots.keySet().removeIf(uuid -> Bukkit.getPlayer(uuid) == null);
         }, 6000L, 6000L);
+    }
+
+    //Keep the authoritative inventory available until its exact snapshot has committed.
+    //Removing it before the async write lets a reopen load an older database copy.
+    private void saveCachedChests() {
+        if (shuttingDown || !savingChests.compareAndSet(false, true))
+            return;
+        Map<UUID, EnderChest> savedChests = new HashMap<>(uuidEnderChestMap);
+        Map<UUID, EnderChestSnapshot> snapshots = new HashMap<>();
+        savedChests.forEach((uuid, chest) -> snapshots.put(uuid, chest.snapshot()));
+        FoliaScheduler.runAsync(getPlugin(), () -> {
+            try {
+                synchronized (saveLock) {
+                    if (shuttingDown)
+                        return;
+                    dataManager.saveEnderChestMultiple(snapshots);
+                }
+            } catch (Exception e) {
+                getPlugin().getLogger().log(Level.SEVERE, "Enderchest save failed. Keeping all cached inventories.", e);
+                savingChests.set(false);
+                return;
+            }
+            if (shuttingDown)
+                return;
+            FoliaScheduler.runGlobal(getPlugin(), () -> {
+                try {
+                    savedChests.forEach((uuid, chest) -> {
+                        EnderChestSnapshot saved = snapshots.get(uuid);
+                        //Pending reads might still hold an older database snapshot.
+                        if (Bukkit.getPlayer(uuid) == null && !chest.hasViewers()
+                                && loadingChests.isEmpty() && uuidCallbackMap.isEmpty() && nameCallbackMap.isEmpty()
+                                && preloadingPlayers.isEmpty() && preloadedPlayers.isEmpty() && preloadedSnapshots.isEmpty()
+                                && chest.getLastNumRows() == saved.getRows()
+                                && Arrays.equals(chest.getContents(), saved.getContents()))
+                            uuidEnderChestMap.remove(uuid, chest);
+                    });
+                } finally {
+                    savingChests.set(false);
+                }
+            });
+        });
     }
 
     private void applyStartupData(Map<UUID, EnderChestSnapshot> data) {
@@ -170,10 +201,10 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
             EnderChestSnapshot snapshot = data.get(player.getUniqueId());
             if (snapshot == null) {
                 this.getPlugin().getLogger().info("Creating new enderchest for " + player.getName());
-                this.uuidEnderChestMap.put(player.getUniqueId(), createNew(player));
+                this.uuidEnderChestMap.putIfAbsent(player.getUniqueId(), createNew(player));
             } else {
                 this.getPlugin().getLogger().info("Loaded enderchest for " + player.getName());
-                this.uuidEnderChestMap.put(player.getUniqueId(),
+                this.uuidEnderChestMap.putIfAbsent(player.getUniqueId(),
                         new EnderChest(player.getUniqueId(), player.getName(), snapshot.getContents(), snapshot.getRows()));
             }
 
@@ -226,6 +257,7 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
         this.preloadedPlayers.remove(uuid);
         this.preloadedSnapshots.remove(uuid);
 
+        this.preloadingPlayers.add(uuid);
         try {
             this.dataManager.saveNameAndUUID(name, uuid);
             EnderChestSnapshot snapshot = this.dataManager.loadEnderChest(uuid);
@@ -240,6 +272,8 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
             this.preloadedSnapshots.remove(uuid);
             this.getPlugin().getLogger().log(Level.WARNING, "Could not preload the enderchest of " + name
                     + " while they were logging in. It will be loaded in the background instead.", e);
+        } finally {
+            this.preloadingPlayers.remove(uuid);
         }
     }
 
@@ -274,10 +308,10 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
         if (preloaded) {
             if (snapshot == null) {
                 this.getPlugin().getLogger().info("Creating new enderchest for " + name);
-                this.uuidEnderChestMap.put(uuid, createNew(player));
+                this.uuidEnderChestMap.putIfAbsent(uuid, createNew(player));
             } else {
                 this.getPlugin().getLogger().info("Loaded enderchest for " + name);
-                this.uuidEnderChestMap.put(uuid, new EnderChest(uuid, name, snapshot.getContents(), snapshot.getRows()));
+                this.uuidEnderChestMap.putIfAbsent(uuid, new EnderChest(uuid, name, snapshot.getContents(), snapshot.getRows()));
             }
             return;
         }
@@ -317,7 +351,7 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
                         return;
 
                     if (enderChest != null) {
-                        this.uuidEnderChestMap.put(uuid, enderChest);
+                        this.uuidEnderChestMap.putIfAbsent(uuid, enderChest);
                         this.nameUUIDMap.put(new CaselessString(name), uuid);
                         return;
                     }
@@ -325,7 +359,7 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
                     //a brand new chest can only be created while the player is online
                     Player online = Bukkit.getPlayer(uuid);
                     if (online != null) {
-                        this.uuidEnderChestMap.put(uuid, createNew(online));
+                        this.uuidEnderChestMap.putIfAbsent(uuid, createNew(online));
                         this.nameUUIDMap.put(new CaselessString(name), uuid);
                     }
                 } finally {
@@ -398,6 +432,7 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
 
     public boolean canMergeVanilla() {
         return !playerDataUsed && uuidEnderChestMap.isEmpty() && loadingChests.isEmpty()
+                && preloadingPlayers.isEmpty() && preloadedPlayers.isEmpty() && preloadedSnapshots.isEmpty()
                 && uuidCallbackMap.isEmpty() && nameCallbackMap.isEmpty() && snapshotsToSave.isEmpty();
     }
 
@@ -463,9 +498,8 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
     /**
      * Returns the cached enderchest of a player.
      * <p>
-     * May return null when called from a server thread while the chest is still being loaded. Loading
-     * it right here would have to wait for the database and would freeze the server while doing so,
-     * so the load is started in the background instead and the caller should try again shortly.
+     * May return null while the chest is loading. All callers share the same background load;
+     * a parallel synchronous read must not create a second inventory for the same player.
      */
     public EnderChest getEnderChest(Player player) {
         if (this.getPlugin().getConverterManager().isConverting())
@@ -476,27 +510,8 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
         if (enderChest != null)
             return enderChest;
 
-        if (Bukkit.isPrimaryThread()) {
-            this.getPlugin().getLogger().warning(player.getName() + "'s enderchest is not loaded yet."
-                    + " Loading it in the background instead of freezing the server.");
-            loadInBackground(player.getName(), player.getUniqueId(), false);
-            return null;
-        }
-
-        //off the server thread it is safe to wait for the database
-        this.getPlugin().getLogger().warning(player.getName() + "'s enderchest could not be found! Loading it synchronously");
-        EnderChestSnapshot snapshot = this.dataManager.loadEnderChest(player.getUniqueId());
-
-        if (snapshot == null) {
-            enderChest = createNew(player);
-        } else {
-            enderChest = new EnderChest(snapshot.getUuid(), snapshot.getName(), snapshot.getContents(), snapshot.getRows());
-        }
-
-        EnderChest existing = this.uuidEnderChestMap.putIfAbsent(player.getUniqueId(), enderChest);
-        this.nameUUIDMap.put(new CaselessString(player.getName()), player.getUniqueId());
-
-        return existing == null ? enderChest : existing;
+        loadInBackground(player.getName(), player.getUniqueId(), false);
+        return null;
     }
 
     //opens ender chest and reopens updated enderchest for players
@@ -680,6 +695,7 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
 
     //saves all data
     public void finishUp() {
+        this.shuttingDown = true;
         for (EnderChest value : this.uuidEnderChestMap.values()) {
             List<HumanEntity> list = new ArrayList<>(value.getInventory().getViewers());
             for (HumanEntity humanEntity : list) {
@@ -692,7 +708,9 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
 
             this.getPlugin().getLogger().info("Saving data for " + value.getName());
         }
-        this.dataManager.saveEnderChestMultiple(enderChestSnapshotMap);
+        synchronized (saveLock) {
+            this.dataManager.saveEnderChestMultiple(enderChestSnapshotMap);
+        }
 
         //saves the snapshots that have not been saved
         for (EnderChestSnapshot enderChestSnapshot : this.snapshotsToSave) {

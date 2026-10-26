@@ -1,0 +1,5 @@
+name: MoveIntegrationTest
+version: 1.0
+main: integration.MoveIntegrationTest
+api-version: '1.21'
+depend: [VariableEnderChests]

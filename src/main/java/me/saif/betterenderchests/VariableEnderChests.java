@@ -30,6 +30,7 @@ import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.plugin.java.JavaPlugin;
+import me.saif.betterenderchests.converters.JoinListener;
 
 import java.io.File;
 import java.sql.SQLException;
@@ -143,6 +144,7 @@ public final class VariableEnderChests extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new EnderChestRetrieverClickListener(this), this);
 
         this.converterManager = new ConverterManager(this);
+        Bukkit.getPluginManager().registerEvents(new JoinListener(this.converterManager), this);
     }
 
     private void setupCommands() {
@@ -186,7 +188,8 @@ public final class VariableEnderChests extends JavaPlugin {
 
     private void loadDisabledWorlds() {
         this.disabledWorlds = new HashSet<>();
-        this.disabledWorlds.addAll(this.getConfig().getStringList("disabled-worlds"));
+        if (!this.getConfig().getBoolean("single-enderchest", true))
+            this.disabledWorlds.addAll(this.getConfig().getStringList("disabled-worlds"));
         this.disabledWorlds = Collections.unmodifiableSet(this.disabledWorlds);
     }
 

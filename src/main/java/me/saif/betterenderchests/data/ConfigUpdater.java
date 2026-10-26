@@ -12,7 +12,7 @@ public class ConfigUpdater {
 
     private VariableEnderChests plugin;
 
-    private final int latest = 7;
+    private final int latest = 8;
 
     private int current;
 
@@ -33,6 +33,13 @@ public class ConfigUpdater {
 
     private void update() {
         this.plugin.getLogger().info("Updating config from version " + this.current + " to " + (this.current + 1));
+
+        if (this.current == 7) {
+            this.plugin.getConfig().set("config-version", 8);
+            this.plugin.getConfig().set("single-enderchest", this.plugin.getConfig().getBoolean("single-enderchest", true));
+            this.current++;
+            this.plugin.saveConfig();
+        }
 
         //updates from 1 to 2
         if (this.current == 1) {

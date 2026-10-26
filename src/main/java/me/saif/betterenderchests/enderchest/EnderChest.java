@@ -47,10 +47,10 @@ public class EnderChest implements InventoryHolder {
             this.inventoryNames.put(integer, s.replace("<player>", name));
         });
         this.retrievalName = RETRIEVAL_NAME.replace("<player>", name);
-        this.contents = contents.length == 54 ? contents : Arrays.copyOf(contents, 54);
+        this.contents = Arrays.copyOf(contents, Math.max(54, contents.length));
         this.inventory = Bukkit.createInventory(this, lastNumRows * 9, this.inventoryNames.get(lastNumRows));
 
-        int retrievalSize = 54 - lastNumRows * 9;
+        int retrievalSize = retrievalSize(lastNumRows);
 
         this.retrievalInventory = Bukkit.createInventory(this.retrivalHolder, retrievalSize == 0 ? 9 : retrievalSize, retrievalSize == 0 ? "Nothing to retrieve" : RETRIEVAL_NAME);
         this.retrivalHolder.setInventory(this.retrievalInventory);
@@ -74,7 +74,7 @@ public class EnderChest implements InventoryHolder {
 
         lastNumRows = rows;
 
-        if (inventory.getSize() == rows * 9)
+        if (inventory.getSize() == rows * 9 && retrievalInventory.getSize() == retrievalSize(rows))
             return;
 
         //else
@@ -86,7 +86,7 @@ public class EnderChest implements InventoryHolder {
         this.inventory = Bukkit.createInventory(this, rows * 9, this.inventoryNames.get(rows));
         ChestSortHook.setSortable(this.inventory);
 
-        int retrievalSize = 54 - lastNumRows * 9;
+        int retrievalSize = retrievalSize(lastNumRows);
 
         this.retrievalInventory = Bukkit.createInventory(this.retrivalHolder, retrievalSize == 0 ? 9 : retrievalSize, retrievalSize == 0 ? "Nothing to retrieve" : this.retrievalName);
         this.retrivalHolder.setInventory(this.retrievalInventory);
@@ -118,8 +118,9 @@ public class EnderChest implements InventoryHolder {
     }
 
     public void setContents(ItemStack[] contents) {
-        this.contents = Arrays.copyOf(contents, 54);
+        this.contents = Arrays.copyOf(contents, Math.max(54, contents.length));
         this.populateInventory();
+        this.setRows(lastNumRows);
     }
 
     public boolean hasViewers() {
@@ -140,17 +141,15 @@ public class EnderChest implements InventoryHolder {
             inventory.setItem(i, this.contents[i]);
         }
 
-        if (inventory.getSize() == 54)
-            return;
-
         for (int i = 0; i < retrievalInventory.getSize(); i++) {
-            retrievalInventory.setItem(i, this.contents[i + inventory.getSize()]);
+            int slot = i + inventory.getSize();
+            retrievalInventory.setItem(i, slot < contents.length ? this.contents[slot] : null);
         }
     }
 
     public ItemStack[] getContents() {
         updateContentsArray();
-        return Arrays.copyOf(contents, 54);
+        return Arrays.copyOf(contents, contents.length);
     }
 
     //this updates the contents array either because we want to save some data or the inventory is being recreated
@@ -159,12 +158,28 @@ public class EnderChest implements InventoryHolder {
             this.contents[i] = inventory.getItem(i);
         }
 
-        if (inventory.getSize() == 54)
-            return;
-
-        for (int i = inventory.getSize(); i < 54; i++) {
+        for (int i = inventory.getSize(); i < Math.min(contents.length, inventory.getSize() + retrievalInventory.getSize()); i++) {
             this.contents[i] = this.retrievalInventory.getItem(i - inventory.getSize());
         }
+    }
+
+    private int retrievalSize(int rows) {
+        return Math.max(9, Math.min(54, ((contents.length - rows * 9 + 8) / 9) * 9));
+    }
+
+    //A merge can hold more than 54 stacks. Reopening retrieval brings the next stacks forward.
+    public void prepareRetrieval() {
+        if (!retrievalInventory.getViewers().isEmpty())
+            return;
+        updateContentsArray();
+        int next = inventory.getSize();
+        for (int i = next; i < contents.length; i++) {
+            ItemStack item = contents[i];
+            if (item != null && !item.getType().isAir() && item.getAmount() > 0)
+                contents[next++] = item;
+        }
+        Arrays.fill(contents, next, contents.length, null);
+        populateInventory();
     }
 
     public int getLastNumRows() {

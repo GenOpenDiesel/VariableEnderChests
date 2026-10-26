@@ -14,7 +14,8 @@ public class ConverterManager {
 
     private VariableEnderChests plugin;
     private Map<CaselessString, Converter> converterMap = new HashMap<>();
-    private boolean converting = false;
+    private volatile boolean converting = false;
+    private volatile boolean restartRequired = false;
 
     public ConverterManager(VariableEnderChests plugin) {
         this.plugin = plugin;
@@ -25,6 +26,7 @@ public class ConverterManager {
         this.addConverter(new CustomEnderChestFlatFileConverter(this.plugin));
         this.addConverter(new BukkitToNBTConverter(this.plugin));
         this.addConverter(new VanillaConverter(this.plugin));
+        this.addConverter(new VanillaMergeConverter(this.plugin));
         this.addConverter(new AdvancedEnderChestConverter(this.plugin));
     }
 
@@ -33,11 +35,15 @@ public class ConverterManager {
     }
 
     public boolean isConverting() {
-        return converting;
+        return converting || restartRequired;
     }
 
     public void setConverting(boolean converting) {
         this.converting = converting;
+    }
+
+    public void requireRestart() {
+        this.restartRequired = true;
     }
 
     public Converter getConverter(String name) {

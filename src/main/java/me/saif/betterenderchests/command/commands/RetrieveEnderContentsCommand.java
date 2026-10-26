@@ -74,15 +74,11 @@ public class RetrieveEnderContentsCommand extends PluginCommand {
         }
 
         if (otherPlayer == null) {
-            if (!player.hasPermission(PERMISSION_SELF)) {
+            if (!player.hasPermission(PERMISSION_SELF) && !this.ecm.hasMergeOverflow(player)) {
                 messenger.sendMessage(player, MessageKey.RETRIEVAL_COMMAND_NO_PERMISSION_SELF);
                 return;
             }
             int rows = this.ecm.getNumRows(player);
-            if (rows == 6) {
-                messenger.sendMessage(player, MessageKey.RETRIEVAL_COMMAND_NOTHING_TO_RETRIEVE_SELF);
-                return;
-            }
 
             EnderChest enderChest = this.ecm.getEnderChest(player);
 
@@ -116,10 +112,6 @@ public class RetrieveEnderContentsCommand extends PluginCommand {
             }
 
             int rows = this.ecm.getNumRows(other);
-            if (rows == 6) {
-                messenger.sendMessage(player, MessageKey.RETRIEVAL_COMMAND_NOTHING_TO_RETRIEVE_OTHERS, playerPlaceholder.getResult(other));
-                return;
-            }
 
             boolean opened = this.ecm.openRetriever(enderChest, player, rows);
 
@@ -137,10 +129,6 @@ public class RetrieveEnderContentsCommand extends PluginCommand {
             }
 
             int rows = enderChest.getLastNumRows();
-            if (rows == 6) {
-                messenger.sendMessage(player, MessageKey.RETRIEVAL_COMMAND_NOTHING_TO_RETRIEVE_OTHERS, PlaceholderResult.of("<player>", enderChest.getName()));
-                return;
-            }
 
             boolean opened = this.ecm.openRetriever(enderChest, player, rows);
 
@@ -171,10 +159,6 @@ public class RetrieveEnderContentsCommand extends PluginCommand {
             }
 
             int rows = this.ecm.getNumRows(other);
-            if (rows == 6) {
-                messenger.sendMessage(console, MessageKey.RETRIEVAL_COMMAND_NO_PERMISSION_OTHERS, playerPlaceholder.getResult(other));
-                return;
-            }
             boolean opened = this.ecm.openRetriever(enderChest, toOpenFor, rows);
 
             if (!opened)
@@ -193,10 +177,6 @@ public class RetrieveEnderContentsCommand extends PluginCommand {
             }
 
             int rows = enderChest.getLastNumRows();
-            if (rows == 6) {
-                messenger.sendMessage(console, MessageKey.RETRIEVAL_COMMAND_NOTHING_TO_RETRIEVE_OTHERS, PlaceholderResult.of("<player>", enderChest.getName()));
-                return;
-            }
 
             boolean opened = this.ecm.openRetriever(enderChest, toOpenFor, rows);
 

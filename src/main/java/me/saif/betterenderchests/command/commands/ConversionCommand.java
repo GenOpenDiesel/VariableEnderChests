@@ -3,6 +3,7 @@ package me.saif.betterenderchests.command.commands;
 import me.saif.betterenderchests.VariableEnderChests;
 import me.saif.betterenderchests.command.PluginCommand;
 import me.saif.betterenderchests.converters.Converter;
+import me.saif.betterenderchests.converters.VanillaMergeConverter;
 import me.saif.betterenderchests.lang.MessageKey;
 import me.saif.betterenderchests.lang.Messenger;
 import me.saif.betterenderchests.lang.placeholder.Placeholder;
@@ -58,6 +59,10 @@ public class ConversionCommand extends PluginCommand {
     }
 
     public void onConvertCommand(ConsoleCommandSender sender, String converterName, String... flags) {
+        if (this.plugin.getConverterManager().isConverting()) {
+            sender.sendMessage("A conversion is running or a server restart is required.");
+            return;
+        }
         if (Bukkit.getOnlinePlayers().size() > 0) {
             messenger.sendMessage(sender, MessageKey.ALL_PLAYERS_OFFLINE);
             return;
@@ -70,16 +75,31 @@ public class ConversionCommand extends PluginCommand {
             return;
         }
 
+        if (converter instanceof VanillaMergeConverter && !this.plugin.getEnderChestManager().canMergeVanilla()) {
+            sender.sendMessage("Restart the server with logins blocked, then run VanillaMergeConverter before any player joins or any chest is loaded.");
+            return;
+        }
+        if (converter instanceof VanillaMergeConverter && flags.length != 0) {
+            sender.sendMessage("VanillaMergeConverter takes no flags; it always preserves both inventories.");
+            return;
+        }
+
         if (this.confirmMap.get(sender) != converter) {
             this.confirmMap.put(sender, converter);
             FoliaScheduler.runGlobalLater(plugin, () -> confirmMap.remove(sender), 100L);
-            messenger.sendMessage(sender, MessageKey.CONFIRM_CONVERTER);
+            if (converter instanceof VanillaMergeConverter)
+                sender.sendMessage("This will MOVE all vanilla EnderItems into plugin storage and CLEAR vanilla chests. "
+                        + "Existing plugin items are preserved and backups are created. Repeat within 5 seconds to confirm. Restart afterwards.");
+            else
+                messenger.sendMessage(sender, MessageKey.CONFIRM_CONVERTER);
             return;
         }
         this.confirmMap.remove(sender);
         messenger.sendMessage(sender, MessageKey.CONVERSION_STARTING, converterPlaceholder.getResult(converter));
 
         this.plugin.getConverterManager().setConverting(true);
+        if (converter instanceof VanillaMergeConverter)
+            this.plugin.getConverterManager().requireRestart();
         CompletableFuture<Boolean> success = CompletableFuture.supplyAsync(() ->
                 converter.convert(flags)
         ).exceptionally(throwable -> {

@@ -15,7 +15,7 @@ public class EnderChestSnapshot {
     public EnderChestSnapshot(UUID uuid, String name, ItemStack[] contents, int rows) {
         this.uuid = uuid;
         this.name = name;
-        this.contents = contents.length == 54 ? contents : Arrays.copyOf(contents, 54);
+        this.contents = Arrays.copyOf(contents, Math.max(54, contents.length));
         this.rows = rows;
     }
 

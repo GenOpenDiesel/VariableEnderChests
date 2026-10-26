@@ -1,5 +1,5 @@
 #Do not change this manually, this is to keep track of config changes.
-config-version: 7
+config-version: 8
 
 #If mysql is set to false, database defaults to a data.db file
 #Do not set mysql to true unless you have a mysql database set up
@@ -15,6 +15,11 @@ database:
 #If set to false, when players log in their vanilla enderchest contents will not transfer over.
 #Whether this is set to true or false, does NOT affect the enderchest contents that is saved by default minecraft.
 convert-current-ender-chest: true
+
+#Use the plugin chest for both blocks and vanilla inventory opens from other plugins.
+#When true, disabled-worlds is ignored so there is only one accessible enderchest.
+#Use enderchestconvert VanillaMergeConverter to MOVE existing vanilla items into plugin storage.
+single-enderchest: true
 
 #If this is set to 0, players will need a permission to be able to open an enderchest
 default-rows: 3

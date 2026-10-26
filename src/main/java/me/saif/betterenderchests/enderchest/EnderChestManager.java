@@ -21,6 +21,8 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryOpenEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -55,6 +57,7 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
     private final Map<UUID, Block> openFromBlocks = new HashMap<>();
     private int defaultRows;
     private final boolean convert;
+    private volatile boolean playerDataUsed;
 
     private final Sound OPEN_SOUND;
     private final Sound CLOSE_SOUND;
@@ -160,6 +163,7 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
 
     private void applyStartupData(Map<UUID, EnderChestSnapshot> data) {
         for (Player player : Bukkit.getOnlinePlayers()) {
+            this.playerDataUsed = true;
             if (this.uuidEnderChestMap.containsKey(player.getUniqueId()))
                 continue;
 
@@ -252,6 +256,7 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
 
     @EventHandler(priority = EventPriority.LOWEST)
     private void onJoin(PlayerJoinEvent event) {
+        this.playerDataUsed = true;
         Player player = event.getPlayer();
         String name = player.getName();
         UUID uuid = player.getUniqueId();
@@ -370,6 +375,32 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
         }
     }
 
+    //Also catches vanilla chests opened by another plugin, or after a cancelled interact event.
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    private void onVanillaOpen(InventoryOpenEvent event) {
+        if (!this.getPlugin().getConfig().getBoolean("single-enderchest", true)
+                || event.getInventory().getType() != InventoryType.ENDER_CHEST
+                || !(event.getPlayer() instanceof Player))
+            return;
+        event.setCancelled(true);
+        Player player = (Player) event.getPlayer();
+        FoliaScheduler.runEntity(this.getPlugin(), player, () -> {
+            if (!player.isOnline())
+                return;
+            int rows = getNumRows(player);
+            if (rows == 0) {
+                this.getPlugin().getMessenger().sendMessage(player, MessageKey.NO_ENDERCHEST_SELF);
+                return;
+            }
+            openEnderChest(getEnderChest(player), player, rows);
+        }, null);
+    }
+
+    public boolean canMergeVanilla() {
+        return !playerDataUsed && uuidEnderChestMap.isEmpty() && loadingChests.isEmpty()
+                && uuidCallbackMap.isEmpty() && nameCallbackMap.isEmpty() && snapshotsToSave.isEmpty();
+    }
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     private void onInventoryClose(InventoryCloseEvent event) {
         if (this.openFromBlocks.containsKey(event.getPlayer().getUniqueId())) {
@@ -437,6 +468,9 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
      * so the load is started in the background instead and the caller should try again shortly.
      */
     public EnderChest getEnderChest(Player player) {
+        if (this.getPlugin().getConverterManager().isConverting())
+            return null;
+        this.playerDataUsed = true;
         EnderChest enderChest = this.uuidEnderChestMap.get(player.getUniqueId());
 
         if (enderChest != null)
@@ -467,8 +501,17 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
 
     //opens ender chest and reopens updated enderchest for players
     public void openEnderChest(EnderChest chest, Player player, int rows) {
+        if (chest == null) {
+            this.getPlugin().getMessenger().sendMessage(player, MessageKey.ENDERCHEST_LOADING_SELF);
+            return;
+        }
         chest.setRows(rows);
         this.openEnderChest(chest, player);
+    }
+
+    public boolean hasMergeOverflow(Player player) {
+        EnderChest chest = this.uuidEnderChestMap.get(player.getUniqueId());
+        return chest != null && chest.getContents().length > 54;
     }
 
     public void openEnderChest(EnderChest chest, Player player) {
@@ -490,6 +533,7 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
     //returns whether there are items and if the inventory was opened.
     public boolean openRetriever(EnderChest chest, Player player, int rows) {
         chest.setRows(rows);
+        chest.prepareRetrieval();
         Inventory inventory = chest.getRetriever().getInventory();
 
         if (!inventory.isEmpty()) {
@@ -523,6 +567,9 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
     }
 
     public Callback<EnderChest> getEnderChest(String name) {
+        if (this.getPlugin().getConverterManager().isConverting())
+            return Callback.withResult(null);
+        this.playerDataUsed = true;
         CaselessString mcName = new CaselessString(name);
         if (this.nameUUIDMap.containsKey(mcName) && this.uuidEnderChestMap.get(this.nameUUIDMap.get(mcName)) != null)
             return Callback.withResult(this.uuidEnderChestMap.get(this.nameUUIDMap.get(mcName)));
@@ -559,6 +606,9 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
     }
 
     public Callback<EnderChest> getEnderChest(UUID uuid) {
+        if (this.getPlugin().getConverterManager().isConverting())
+            return Callback.withResult(null);
+        this.playerDataUsed = true;
         if (this.uuidEnderChestMap.get(uuid) != null)
             return Callback.withResult(this.uuidEnderChestMap.get(uuid));
 

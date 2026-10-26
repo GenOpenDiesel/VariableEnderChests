@@ -25,7 +25,7 @@ public class CommandManager {
             bukkitCommandMap.setAccessible(true);
             SimpleCommandMap commandMap = (SimpleCommandMap) bukkitCommandMap.get(Bukkit.getServer());
 
-            Command bukkitCommand = new CommandImpl(command);
+            Command bukkitCommand = new CommandImpl(plugin, command);
 
             removeFromCommandMap(bukkitCommand);
 

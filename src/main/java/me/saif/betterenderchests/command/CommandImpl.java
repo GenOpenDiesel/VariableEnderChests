@@ -2,15 +2,18 @@ package me.saif.betterenderchests.command;
 
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import me.saif.betterenderchests.VariableEnderChests;
 
 import java.util.List;
 
 public class CommandImpl extends Command {
 
     private final PluginCommand command;
+    private final VariableEnderChests plugin;
 
-    protected CommandImpl(PluginCommand command) {
+    protected CommandImpl(VariableEnderChests plugin, PluginCommand command) {
         super(command.getName());
+        this.plugin = plugin;
         this.setAliases(command.getAliases());
 
         if (command.requiresPermission()) {
@@ -22,6 +25,10 @@ public class CommandImpl extends Command {
 
     @Override
     public boolean execute(CommandSender sender, String commandLabel, String[] args) {
+        if (plugin.getConverterManager().isConverting()) {
+            sender.sendMessage("Enderchest conversion in progress or server restart required.");
+            return true;
+        }
         this.command.onCommand(sender, commandLabel, args);
         return true;
     }

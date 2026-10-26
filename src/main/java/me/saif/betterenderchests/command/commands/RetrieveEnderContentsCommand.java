@@ -74,16 +74,16 @@ public class RetrieveEnderContentsCommand extends PluginCommand {
         }
 
         if (otherPlayer == null) {
-            if (!player.hasPermission(PERMISSION_SELF) && !this.ecm.hasMergeOverflow(player)) {
-                messenger.sendMessage(player, MessageKey.RETRIEVAL_COMMAND_NO_PERMISSION_SELF);
-                return;
-            }
             int rows = this.ecm.getNumRows(player);
 
             EnderChest enderChest = this.ecm.getEnderChest(player);
 
             if (enderChest == null) {
                 messenger.sendMessage(player, MessageKey.ENDERCHEST_LOADING_SELF);
+                return;
+            }
+            if (!player.hasPermission(PERMISSION_SELF) && !this.ecm.hasMergeOverflow(player)) {
+                messenger.sendMessage(player, MessageKey.RETRIEVAL_COMMAND_NO_PERMISSION_SELF);
                 return;
             }
             //open the retrieval inv

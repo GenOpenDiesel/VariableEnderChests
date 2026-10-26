@@ -526,7 +526,15 @@ public class EnderChestManager extends Manager<VariableEnderChests> implements L
 
     public boolean hasMergeOverflow(Player player) {
         EnderChest chest = this.uuidEnderChestMap.get(player.getUniqueId());
-        return chest != null && chest.getContents().length > 54;
+        if (chest == null)
+            return false;
+        ItemStack[] contents = chest.getContents();
+        for (int slot = getNumRows(player) * 9; slot < contents.length; slot++) {
+            ItemStack item = contents[slot];
+            if (item != null && !item.getType().isAir() && item.getAmount() > 0)
+                return true;
+        }
+        return false;
     }
 
     public void openEnderChest(EnderChest chest, Player player) {

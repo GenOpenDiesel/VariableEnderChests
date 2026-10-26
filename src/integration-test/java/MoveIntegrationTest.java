@@ -2,6 +2,7 @@ package integration;
 
 import me.saif.betterenderchests.VariableEnderChests;
 import me.saif.betterenderchests.command.commands.EnderChestCommand;
+import me.saif.betterenderchests.command.commands.RetrieveEnderContentsCommand;
 import me.saif.betterenderchests.converters.VanillaMergeConverter;
 import me.saif.betterenderchests.enderchest.*;
 import me.saif.betterenderchests.nbtapi.*;
@@ -54,7 +55,7 @@ public final class MoveIntegrationTest extends JavaPlugin {
         Files.createDirectories(playerdata);
         try (Connection c = vec.getSQLDatabase().getConnection(); Statement s = c.createStatement()) {
             s.executeUpdate("DROP TRIGGER IF EXISTS reject_move");
-            for (int i = 1; i <= 7; i++) {
+            for (int i = 1; i <= 8; i++) {
                 Files.deleteIfExists(file(id(i)));
                 s.executeUpdate("DELETE FROM enderchests WHERE UUID='" + id(i) + "'");
                 //The journal is created by the converter; it may not exist on the first run.
@@ -99,6 +100,10 @@ public final class MoveIntegrationTest extends JavaPlugin {
         sparse[50] = named(Material.EMERALD, 11, "keep original slot");
         put(id(3), sparse);
         source(id(3), new ItemStack[]{named(Material.DIAMOND, 9, "incoming")});
+        ItemStack[] smallFull = new ItemStack[54];
+        for (int i = 0; i < 27; i++) smallFull[i] = named(Material.DIAMOND, 64, "small-existing-" + i);
+        put(id(8), smallFull, 3);
+        source(id(8), vanilla);
         require(vec.getConverterManager().getConverter("VanillaConverter") instanceof VanillaMergeConverter,
                 "legacy converter name is also a safe move");
         require(vec.getConverterManager().getConverter("VanillaConverter").convert(), "migration succeeds using legacy command name");
@@ -110,6 +115,13 @@ public final class MoveIntegrationTest extends JavaPlugin {
         require(new NBTFile(file(full).toFile()).getString("UnrelatedSentinel").equals("keep me"), "unrelated NBT preserved");
         require(load(id(2))[0].getAmount() == 17, "player with no plugin chest moved");
         require(load(id(3))[50].getAmount() == 11 && load(id(3))[0].getAmount() == 9, "sparse merge preserves existing slots");
+        ItemStack[] smallMerged = load(id(8));
+        require(smallMerged.length == 54, "full 27-slot plugin chest plus full vanilla keeps all 54 stacks");
+        for (int i = 0; i < 27; i++) {
+            require(smallFull[i].equals(smallMerged[i]), "small plugin chest keeps original stack " + i);
+            require(vanilla[i].equals(smallMerged[i + 27]), "small plugin chest keeps incoming stack/shulker " + i);
+        }
+        require(new NBTFile(file(id(8)).toFile()).getCompoundList("EnderItems").isEmpty(), "small chest source cleared only after complete merge");
         if (Files.exists(file(id(7)))) {
             ItemStack[] upgraded = load(id(7));
             require(upgraded[0].getType() == Material.EMERALD && upgraded[0].getAmount() == 64,
@@ -187,6 +199,8 @@ public final class MoveIntegrationTest extends JavaPlugin {
         Field cacheField = vec.getEnderChestManager().getClass().getDeclaredField("uuidEnderChestMap");
         cacheField.setAccessible(true);
         @SuppressWarnings("unchecked") Map<UUID,EnderChest> cache = (Map<UUID,EnderChest>) cacheField.get(vec.getEnderChestManager());
+        retrievalWithoutPermission(ctor, cache, id(8), load(id(8)), 3);
+        retrievalWithoutPermission(ctor, cache, full, expected, 6);
         cache.put(full, chest);
         Inventory empty = Bukkit.createInventory(null, 9);
         Inventory[] opened = new Inventory[1];
@@ -238,6 +252,43 @@ public final class MoveIntegrationTest extends JavaPlugin {
         }, 3L);
     }
 
+    private void retrievalWithoutPermission(Constructor<EnderChest> ctor, Map<UUID,EnderChest> cache,
+                                             UUID owner, ItemStack[] contents, int rows) throws Exception {
+        EnderChest chest = ctor.newInstance(owner, "OverflowOwner", contents, rows);
+        cache.put(owner, chest);
+        Inventory[] opened = new Inventory[1];
+        Player[] ref = new Player[1];
+        InventoryView emptyView = view(Bukkit.createInventory(null, 9), ref);
+        Player ownerPlayer = (Player) Proxy.newProxyInstance(getClassLoader(), new Class<?>[]{Player.class}, (p,m,a) -> {
+            switch (m.getName()) {
+                case "getUniqueId": return owner;
+                case "getName": return "OverflowOwner";
+                case "getLocale": return "en_us";
+                case "getWorld": return Bukkit.getWorlds().get(0);
+                case "getOpenInventory": return emptyView;
+                case "hasPermission": return a[0].equals("enderchest.size." + rows);
+                case "isOnline": return true;
+                case "openInventory": opened[0] = (Inventory) a[0]; return emptyView;
+                case "hashCode": return System.identityHashCode(p);
+                case "equals": return p == a[0];
+                default: return zero(m.getReturnType());
+            }
+        });
+        ref[0] = ownerPlayer;
+        require(!ownerPlayer.hasPermission("enderchest.retrieve"), "overflow test owner has no retrieval permission");
+        require(vec.getEnderChestManager().hasMergeOverflow(ownerPlayer), "overflow is detected relative to actual visible capacity");
+        new RetrieveEnderContentsCommand(vec, "retrieveender", List.of()).onCommand(ownerPlayer, "retrieveender", new String[0]);
+        require(opened[0] == chest.getRetriever().getInventory(), "owner opens overflow through command without extra permission");
+        int received = occupied(opened[0].getContents());
+        require(received == 27, "all 27 incoming stacks can be retrieved for rows=" + rows);
+        opened[0].clear();
+        chest.prepareRetrieval();
+        require(chest.getRetriever().getInventory().isEmpty(), "retrieved overflow cannot reappear for rows=" + rows);
+        require(occupied(chest.getContents()) + received == occupied(contents), "original and retrieved stack totals are conserved for rows=" + rows);
+        require(!vec.getEnderChestManager().hasMergeOverflow(ownerPlayer), "no hidden stacks remain after retrieval");
+        cache.remove(owner);
+    }
+
     private InventoryView view(Inventory top, Player[] player) {
         return (InventoryView) Proxy.newProxyInstance(getClassLoader(), new Class<?>[]{InventoryView.class}, (p,m,a) -> {
             switch (m.getName()) {
@@ -283,9 +334,13 @@ public final class MoveIntegrationTest extends JavaPlugin {
         data.save();
     }
     private void put(UUID uuid, ItemStack[] contents) throws Exception {
-        try (Connection c = vec.getSQLDatabase().getConnection(); PreparedStatement s = c.prepareStatement("REPLACE INTO enderchests (UUID,`ROWS`,CONTENTS) VALUES (?,6,?)")) {
+        put(uuid, contents, 6);
+    }
+    private void put(UUID uuid, ItemStack[] contents, int rows) throws Exception {
+        try (Connection c = vec.getSQLDatabase().getConnection(); PreparedStatement s = c.prepareStatement("REPLACE INTO enderchests (UUID,`ROWS`,CONTENTS) VALUES (?,?,?)")) {
             s.setString(1, uuid.toString());
-            s.setString(2, ItemStackSerializer.serialize(contents));
+            s.setInt(2, rows);
+            s.setString(3, ItemStackSerializer.serialize(contents));
             s.executeUpdate();
         }
     }

@@ -1,7 +1,7 @@
 # Disposable Paper integration test
 
 Never install this helper on a real server. It generates synthetic `playerdata`
-for UUIDs `00000000-0000-0000-0000-000000000001` through `...0007` and resets
+for UUIDs `00000000-0000-0000-0000-000000000001` through `...0008` and resets
 those fixtures. It refuses to run unless the main world is called `test-world`,
 the working directory contains `ALLOW_SYNTHETIC_VEC_TESTS`, and nobody is online.
 
@@ -47,3 +47,5 @@ prints an expected error before the successful result.
 
 Version 1.11.9.4 passed 122 migration assertions and 30 anti-duplication
 assertions on Paper 26.3 build 223 / Java 25 on 2026-10-26.
+Version 1.11.9.5 passed 192 migration assertions on the same runtime, including
+full 27+27 and 54+27 chests and owner retrieval without the retrieval permission.

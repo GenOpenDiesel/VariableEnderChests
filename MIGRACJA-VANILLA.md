@@ -2,14 +2,25 @@
 
 ## Minecraft 26.3
 
-Wersja 1.11.9.4 zawiera NBT-API 2.16.1 z obsługą Minecraft 26.3.
-Sprawdzona na Paper 26.3 build 223 i Java 25: 122 sprawdzenia migracji
-i 30 sprawdzeń zabezpieczeń przed kopiowaniem,
-w tym odczyt starej bazy i migracja danych vanilla z 1.21.11, shulkery,
+Wersja 1.11.9.5 zawiera NBT-API 2.16.1 z obsługą Minecraft 26.3.
+Migrację i odbiór nadmiaru sprawdzono na Paper 26.3 build 223 i Java 25:
+192 sprawdzenia, w tym odczyt starej bazy i migracja danych vanilla z 1.21.11, shulkery,
 nowy przedmiot z 26.3, odbiór nadmiaru oraz wspólna skrzynka dla bloku i komendy.
 Serwer Paper 26.3 wymaga Java 25.
 
 Podmień JAR przy wyłączonym serwerze. Zachowaj konfigurację i `data.db`.
+
+## Gdy obie skrzynki są pełne
+
+| Skrzynka pluginowa | Vanilla | Zachowane po migracji |
+| --- | --- | --- |
+| 27 pełnych slotów | 27 pełnych slotów | 54 stosy: 27 widocznych i 27 do odbioru |
+| 54 pełne sloty | 27 pełnych slotów | 81 stosów: 54 widoczne i 27 do odbioru |
+
+Nadmiar zostaje w bazie, a właściciel odbiera go przez `/retrieveender`,
+również bez dodatkowej permisji. Dotyczy to także nadmiaru mieszczącego się
+w 54 slotach zapisu, ale przekraczającego aktualną pojemność widocznej skrzynki.
+Istniejące przedmioty nie są nadpisywane ani wyrzucane na ziemię.
 
 ## Zabezpieczenia przed kopiowaniem w 1.11.9.4
 
